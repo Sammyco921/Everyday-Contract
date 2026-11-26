@@ -88,6 +88,15 @@ struct CorrectiveRegressionTests {
         )
     }
 
+    private func commandResultMessage(result: [String: JSONValue]?) -> ContractMessage {
+        ContractMessage(
+            envelope: makeEnvelope(payloadKind: .response),
+            payload: .response(
+                .commandResult(CommandResult(status: .completed, result: result))
+            )
+        )
+    }
+
     private func nest(_ value: JSONValue, containers: Int) -> JSONValue {
         var result = value
         for _ in 0..<containers {
@@ -1074,6 +1083,75 @@ struct CorrectiveRegressionTests {
             maximum: ContractLimits.maximumPageSize
         )) {
             _ = try JSONContractCoder.encode(overMaximum)
+        }
+    }
+
+    // MARK: - L5: response-side command-result metadata limits
+
+    @Test("Command result metadata with 64 entries is accepted")
+    func commandResultMetadataCountAtMaximumIsAccepted() throws {
+        var result: [String: JSONValue] = [:]
+        for index in 0..<ContractLimits.maximumParameterCount {
+            result["key\(index)"] = .int(Int64(index))
+        }
+        #expect(try JSONContractCoder.encode(commandResultMessage(result: result)).isEmpty == false)
+    }
+
+    @Test("Command result metadata with 65 entries is rejected")
+    func commandResultMetadataBeyondMaximumCountIsRejected() {
+        var result: [String: JSONValue] = [:]
+        for index in 0...ContractLimits.maximumParameterCount {
+            result["key\(index)"] = .int(Int64(index))
+        }
+        #expect(throws: ContractValidationError.parameterCountExceeded(
+            count: ContractLimits.maximumParameterCount + 1,
+            maximum: ContractLimits.maximumParameterCount
+        )) {
+            _ = try JSONContractCoder.encode(commandResultMessage(result: result))
+        }
+    }
+
+    @Test("Command result metadata byte boundary is inclusive at 16 KiB")
+    func commandResultMetadataBytesAtMaximumAreAccepted() throws {
+        let emptyTextBytes = try encodedParameterByteCount(["text": .string("")])
+        let textLength = ContractLimits.maximumParameterBytes - emptyTextBytes
+        let atMaximum: [String: JSONValue] = [
+            "text": .string(String(repeating: "x", count: textLength))
+        ]
+        #expect(try encodedParameterByteCount(atMaximum) == ContractLimits.maximumParameterBytes)
+        #expect(try JSONContractCoder.encode(commandResultMessage(result: atMaximum)).isEmpty == false)
+    }
+
+    @Test("Command result metadata over 16 KiB is rejected")
+    func commandResultMetadataBeyondMaximumBytesIsRejected() throws {
+        let emptyTextBytes = try encodedParameterByteCount(["text": .string("")])
+        let textLength = ContractLimits.maximumParameterBytes - emptyTextBytes
+        let overMaximum: [String: JSONValue] = [
+            "text": .string(String(repeating: "x", count: textLength + 1))
+        ]
+        #expect(try encodedParameterByteCount(overMaximum) == ContractLimits.maximumParameterBytes + 1)
+        #expect(throws: ContractValidationError.parameterBytesExceeded(
+            bytes: ContractLimits.maximumParameterBytes + 1,
+            maximum: ContractLimits.maximumParameterBytes
+        )) {
+            _ = try JSONContractCoder.encode(commandResultMessage(result: overMaximum))
+        }
+    }
+
+    @Test("Command result nesting validation remains enforced")
+    func commandResultNestingRemainsEnforced() throws {
+        let atMaximum = nest(.int(1), containers: ContractLimits.maximumJSONNestingDepth)
+        #expect(try JSONContractCoder.encode(
+            commandResultMessage(result: ["nested": atMaximum])
+        ).isEmpty == false)
+
+        let overMaximum = nest(.int(1), containers: ContractLimits.maximumJSONNestingDepth + 1)
+        #expect(throws: ContractValidationError.jsonNestingExceeded(
+            maximum: ContractLimits.maximumJSONNestingDepth
+        )) {
+            _ = try JSONContractCoder.encode(
+                commandResultMessage(result: ["nested": overMaximum])
+            )
         }
     }
 }
