@@ -1,0 +1,18 @@
+{
+  "envelope": {
+    "messageID": "msg-007",
+    "correlationID": "msg-001",
+    "sessionID": "session-001",
+    "protocolVersion": "1.0.0",
+    "schemaVersion": "1.0.0",
+    "payloadKind": "acknowledgement",
+    "origin": "client"
+  },
+  "payload": {
+    "kind": "acknowledgement",
+    "value": {
+      "meaning": "transportReceipt",
+      "acknowledgedMessageID": "msg-001"
+    }
+  }
+}

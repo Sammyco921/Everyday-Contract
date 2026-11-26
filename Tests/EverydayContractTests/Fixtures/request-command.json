@@ -1,0 +1,28 @@
+{
+  "envelope": {
+    "messageID": "msg-001",
+    "correlationID": "corr-001",
+    "sessionID": "session-001",
+    "protocolVersion": "1.0.0",
+    "schemaVersion": "1.0.0",
+    "payloadKind": "request",
+    "idempotencyKey": "idem-001",
+    "origin": "client"
+  },
+  "payload": {
+    "kind": "request",
+    "value": {
+      "kind": "command",
+      "value": {
+        "command": "createObjective",
+        "target": {
+          "kind": "none"
+        },
+        "parameters": {
+          "intent": "Prepare a summary",
+          "priority": 2
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "envelope": {
+    "messageID": "msg-006",
+    "correlationID": "corr-heartbeat-006",
+    "protocolVersion": "1.0.0",
+    "schemaVersion": "1.0.0",
+    "payloadKind": "heartbeat",
+    "origin": "client"
+  },
+  "payload": {
+    "kind": "heartbeat",
+    "value": {
+      "state": "live"
+    }
+  }
+}

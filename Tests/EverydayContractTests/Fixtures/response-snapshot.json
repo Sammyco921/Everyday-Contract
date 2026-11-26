@@ -1,0 +1,45 @@
+{
+  "envelope": {
+    "messageID": "msg-002",
+    "correlationID": "msg-001",
+    "causationID": "msg-001",
+    "sessionID": "session-001",
+    "hostIdentity": "host-primary",
+    "hostPosition": 42,
+    "protocolVersion": "1.0.0",
+    "schemaVersion": "1.0.0",
+    "payloadKind": "response",
+    "origin": "host"
+  },
+  "payload": {
+    "kind": "response",
+    "value": {
+      "kind": "synchronization",
+      "value": {
+        "kind": "snapshot",
+        "value": {
+          "projection": "tasks",
+          "hostPosition": 42,
+          "hostIdentity": "host-primary",
+          "payload": {
+            "kind": "tasks",
+            "value": [
+              {
+                "objectiveID": "objective-001",
+                "objectiveVersion": 1,
+                "runID": "run-001",
+                "planVersion": 1,
+                "status": "active",
+                "currentWorkItemID": "work-003",
+                "completedWorkItemCount": 2,
+                "remainingWorkItemCount": 1,
+                "elapsedMilliseconds": 12500,
+                "verificationState": "pending"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "envelope": {
+    "messageID": "msg-004",
+    "correlationID": "corr-003",
+    "sessionID": "session-001",
+    "protocolVersion": "1.0.0",
+    "schemaVersion": "1.0.0",
+    "payloadKind": "error",
+    "origin": "host"
+  },
+  "payload": {
+    "kind": "error",
+    "value": {
+      "classification": "staleConsistency",
+      "code": "cursorGap",
+      "message": "The Client cursor is behind the Host position.",
+      "nextStep": "Resynchronize before submitting a consequential approval.",
+      "retry": "afterResynchronization"
+    }
+  }
+}
