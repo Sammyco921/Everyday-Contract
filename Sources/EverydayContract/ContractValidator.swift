@@ -147,22 +147,7 @@ public enum ContractValidator {
             guard envelope.idempotencyKey != nil else {
                 throw ContractValidationError.missingIdempotencyKey
             }
-            guard command.parameters.count <= ContractLimits.maximumParameterCount else {
-                throw ContractValidationError.parameterCountExceeded(
-                    count: command.parameters.count,
-                    maximum: ContractLimits.maximumParameterCount
-                )
-            }
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-            let bytes = try encoder.encode(command.parameters).count
-            guard bytes <= ContractLimits.maximumParameterBytes else {
-                throw ContractValidationError.parameterBytesExceeded(
-                    bytes: bytes,
-                    maximum: ContractLimits.maximumParameterBytes
-                )
-            }
-            try validateJSONNesting(command.parameters.values)
+            try validateJSONMetadata(command.parameters)
         case .synchronize:
             break
         }
@@ -197,7 +182,7 @@ public enum ContractValidator {
                 }
             }
             if let payload = result.result {
-                try validateJSONNesting(payload.values)
+                try validateJSONMetadata(payload)
             }
         case let .synchronization(synchronization):
             switch synchronization {
@@ -286,6 +271,28 @@ public enum ContractValidator {
                 maximum: ContractLimits.maximumPageSize
             )
         }
+    }
+
+    /// Applies the shared JSON metadata limits to command parameters and command-result metadata.
+    /// The existing `parameter*` errors are reused on both sides to preserve the public error surface;
+    /// they report the same limit violation regardless of which side carried the metadata.
+    private static func validateJSONMetadata(_ metadata: [String: JSONValue]) throws {
+        guard metadata.count <= ContractLimits.maximumParameterCount else {
+            throw ContractValidationError.parameterCountExceeded(
+                count: metadata.count,
+                maximum: ContractLimits.maximumParameterCount
+            )
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let bytes = try encoder.encode(metadata).count
+        guard bytes <= ContractLimits.maximumParameterBytes else {
+            throw ContractValidationError.parameterBytesExceeded(
+                bytes: bytes,
+                maximum: ContractLimits.maximumParameterBytes
+            )
+        }
+        try validateJSONNesting(metadata.values)
     }
 
     private static func validateJSONNesting(_ values: Dictionary<String, JSONValue>.Values) throws {

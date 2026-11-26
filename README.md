@@ -105,7 +105,7 @@ Contract releases use SemVer. The supported grammar is the strict numeric triple
 build metadata such as `1.0.0-alpha` or `1.0.0+build.5` are **not** currently supported and are
 rejected as malformed.
 
-The baseline profile is Contract package `1.0.0`, protocol `1.0.0`, schema `1.0.0`, and supported
+The baseline profile is Contract package `1.0.1`, protocol `1.0.0`, schema `1.0.0`, and supported
 protocol range `1.0.0...1.0.0`. `ProtocolRange.supports(_:)`, `ProtocolRange.intersection(with:)`,
 and profile validation are package-local compatibility helpers over the versions peers declare. They
 do not perform a wire-level version-negotiation handshake; applications decide how to exchange
