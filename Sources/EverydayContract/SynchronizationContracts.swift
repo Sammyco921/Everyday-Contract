@@ -187,6 +187,73 @@ public struct ConversationMessageReference: Codable, Hashable, Sendable {
     }
 }
 
+/// Role of a Host-authored conversation message. The owner and assistant roles describe
+/// authorship for display and carry no authority.
+public enum ConversationMessageRole: String, Codable, CaseIterable, Sendable {
+    case owner
+    case assistant
+}
+
+/// Host-authored publication of actual text content in one conversation message.
+///
+/// This is a separate body-bearing representation. It does not repurpose `ConversationMessageReference`
+/// or `ContentAvailability`, and it carries no attachment, image, file, or artifact payload. The
+/// envelope supplies Host identity, correlation, and causation; `hostPosition` must agree with the
+/// envelope position.
+public struct ConversationMessageContent: Codable, Hashable, Sendable {
+    public let messageID: ConversationMessageID
+    public let conversationID: ConversationID
+    public let role: ConversationMessageRole
+    public let body: ConversationMessageBody
+    public let hostPosition: HostPosition
+
+    public init(
+        messageID: ConversationMessageID,
+        conversationID: ConversationID,
+        role: ConversationMessageRole,
+        body: ConversationMessageBody,
+        hostPosition: HostPosition
+    ) {
+        self.messageID = messageID
+        self.conversationID = conversationID
+        self.role = role
+        self.body = body
+        self.hostPosition = hostPosition
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case messageID
+        case conversationID
+        case role
+        case body
+        case hostPosition
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictContainer(
+            CodingKeys.self,
+            from: decoder,
+            type: "ConversationMessageContent"
+        )
+        self.init(
+            messageID: try container.decode(ConversationMessageID.self, forKey: .messageID),
+            conversationID: try container.decode(ConversationID.self, forKey: .conversationID),
+            role: try container.decode(ConversationMessageRole.self, forKey: .role),
+            body: try container.decode(ConversationMessageBody.self, forKey: .body),
+            hostPosition: try container.decode(HostPosition.self, forKey: .hostPosition)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(messageID, forKey: .messageID)
+        try container.encode(conversationID, forKey: .conversationID)
+        try container.encode(role, forKey: .role)
+        try container.encode(body, forKey: .body)
+        try container.encode(hostPosition, forKey: .hostPosition)
+    }
+}
+
 public struct ConversationProjection: Codable, Hashable, Sendable {
     public let conversationID: ConversationID
     public let associatedObjectiveID: ObjectiveID?

@@ -163,7 +163,7 @@ public struct ContractProfile: Codable, Hashable, Sendable {
 public enum ContractProfiles {
     /// The baseline contract implemented by this package. No future compatibility is claimed.
     public static let v1 = ContractProfile(
-        packageVersion: .v1_0_0,
+        packageVersion: SemanticVersion(major: 1, minor: 1, patch: 0),
         protocolVersion: .v1_0_0,
         supportedProtocolRange: try! ProtocolRange(
             minimum: .v1_0_0,

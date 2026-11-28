@@ -168,8 +168,128 @@ public struct QueryRequest: Codable, Hashable, Sendable {
     }
 }
 
-/// Client command intents from the approved communication architecture. A command is never authority:
+/// A non-empty text body for one conversation message.
+///
+/// The original string is retained; trimming is used only to reject bodies that contain no visible
+/// text. A body may not contain attachments, files, images, or artifact content. It is bounded by
+/// UTF-8 byte length and Unicode scalar count so neither dense multibyte text nor long single-byte
+/// text can bypass a limit.
+public struct ConversationMessageBody: Codable, Hashable, Sendable {
+    public static let maximumUTF8Bytes = ContractLimits.maximumConversationMessageBodyUTF8Bytes
+    public static let maximumUnicodeScalars = ContractLimits.maximumConversationMessageBodyUnicodeScalars
+
+    public let rawValue: String
+
+    public init?(_ rawValue: String) {
+        guard Self.failureReason(for: rawValue) == nil else { return nil }
+        self.rawValue = rawValue
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self)
+        if let reason = Self.failureReason(for: value) {
+            throw ContractDecodingError.invalidConversationMessageBody(reason: reason)
+        }
+        self.rawValue = value
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
+    private static func failureReason(for value: String) -> String? {
+        guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "body is empty after trimming"
+        }
+        let bytes = value.utf8.count
+        guard bytes <= maximumUTF8Bytes else {
+            return "UTF-8 byte length \(bytes) exceeds \(maximumUTF8Bytes)"
+        }
+        let scalars = value.unicodeScalars.count
+        guard scalars <= maximumUnicodeScalars else {
+            return "Unicode scalar count \(scalars) exceeds \(maximumUnicodeScalars)"
+        }
+        return nil
+    }
+}
+
+/// Client intent to append one bounded text message to a designated conversation.
+///
+/// This is intent only. It carries no sender-supplied Host identity or position and no approval,
+/// tool, objective, task, execution, attachment, or artifact fields. The Host remains responsible for
+/// authentication, authorization, persistence, inference, outcomes, and publication.
+public struct ConversationMessageSubmission: Codable, Hashable, Sendable {
+    public let conversationID: ConversationID
+    public let body: ConversationMessageBody
+
+    public init(conversationID: ConversationID, body: ConversationMessageBody) {
+        self.conversationID = conversationID
+        self.body = body
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case conversationID
+        case body
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictContainer(
+            CodingKeys.self,
+            from: decoder,
+            type: "ConversationMessageSubmission"
+        )
+        self.init(
+            conversationID: try container.decode(ConversationID.self, forKey: .conversationID),
+            body: try container.decode(ConversationMessageBody.self, forKey: .body)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(conversationID, forKey: .conversationID)
+        try container.encode(body, forKey: .body)
+    }
+}
+
+/// Typed payloads for commands that cannot be expressed safely as generic JSON intent.
+public enum CommandPayload: Codable, Hashable, Sendable {
+    case conversationMessageSubmission(ConversationMessageSubmission)
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case value
+    }
+
+    private enum Kind: String, Codable, Sendable {
+        case conversationMessageSubmission
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictContainer(CodingKeys.self, from: decoder, type: "CommandPayload")
+        switch try container.decode(Kind.self, forKey: .kind) {
+        case .conversationMessageSubmission:
+            self = .conversationMessageSubmission(
+                try container.decode(ConversationMessageSubmission.self, forKey: .value)
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case let .conversationMessageSubmission(value):
+            try container.encode(Kind.conversationMessageSubmission, forKey: .kind)
+            try container.encode(value, forKey: .value)
+        }
+    }
+}
+
+/// Client command intents in the shared communication contract. A command is never authority:
 /// the Host validates identity, authority, target, parameters, consequences, and required approval.
+/// `submitConversationMessage` uses `CommandPayload.conversationMessageSubmission` rather than generic
+/// parameters for its message body.
 public enum CommandKind: String, Codable, CaseIterable, Sendable {
     case createObjective
     case modifyObjective
@@ -184,6 +304,7 @@ public enum CommandKind: String, Codable, CaseIterable, Sendable {
     case changeSetting
     case configureChannel
     case revokeDevice
+    case submitConversationMessage
 }
 
 public enum ContractTarget: Codable, Hashable, Sendable {
@@ -255,17 +376,28 @@ public struct CommandRequest: Codable, Hashable, Sendable {
     public let command: CommandKind
     public let target: ContractTarget?
     public let parameters: [String: JSONValue]
+    /// A typed command-specific payload. It is optional so existing generic command shapes remain
+    /// compatible; `submitConversationMessage` requires its typed payload and forbids generic
+    /// parameters.
+    public let payload: CommandPayload?
 
-    public init(command: CommandKind, target: ContractTarget? = nil, parameters: [String: JSONValue] = [:]) {
+    public init(
+        command: CommandKind,
+        target: ContractTarget? = nil,
+        parameters: [String: JSONValue] = [:],
+        payload: CommandPayload? = nil
+    ) {
         self.command = command
         self.target = target
         self.parameters = parameters
+        self.payload = payload
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case command
         case target
         case parameters
+        case payload
     }
 
     public init(from decoder: Decoder) throws {
@@ -273,7 +405,8 @@ public struct CommandRequest: Codable, Hashable, Sendable {
         self.init(
             command: try container.decode(CommandKind.self, forKey: .command),
             target: try container.decodeIfPresent(ContractTarget.self, forKey: .target),
-            parameters: try container.decode([String: JSONValue].self, forKey: .parameters)
+            parameters: try container.decode([String: JSONValue].self, forKey: .parameters),
+            payload: try container.decodeIfPresent(CommandPayload.self, forKey: .payload)
         )
     }
 
@@ -282,6 +415,7 @@ public struct CommandRequest: Codable, Hashable, Sendable {
         try container.encode(command, forKey: .command)
         try container.encodeIfPresent(target, forKey: .target)
         try container.encode(parameters, forKey: .parameters)
+        try container.encodeIfPresent(payload, forKey: .payload)
     }
 }
 

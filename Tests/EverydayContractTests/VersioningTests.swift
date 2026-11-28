@@ -100,7 +100,7 @@ struct VersioningTests {
 
     @Test("Current profile claims only its implemented baseline")
     func currentProfile() {
-        #expect(ContractProfiles.current.packageVersion == .v1_0_0)
+        #expect(ContractProfiles.current.packageVersion == SemanticVersion(major: 1, minor: 1, patch: 0))
         #expect(ContractProfiles.current.protocolVersion == .v1_0_0)
         #expect(ContractProfiles.current.schemaVersion == .v1_0_0)
         #expect(!ContractProfiles.current.supportedProtocolRange.supports(

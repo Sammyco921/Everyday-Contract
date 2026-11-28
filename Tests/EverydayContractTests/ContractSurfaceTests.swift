@@ -31,10 +31,11 @@ struct ContractSurfaceTests {
             .revokeGrant,
             .changeSetting,
             .configureChannel,
-            .revokeDevice
+            .revokeDevice,
+            .submitConversationMessage
         ]
-        #expect(commands.count == 13)
-        #expect(Set(commands.map(\.rawValue)).count == 13)
+        #expect(commands.count == 14)
+        #expect(Set(commands.map(\.rawValue)).count == 14)
     }
 
     @Test("Error classes match the approved reporting taxonomy")
