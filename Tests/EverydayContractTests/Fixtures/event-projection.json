@@ -5,8 +5,8 @@
     "sessionID": "session-001",
     "hostIdentity": "host-primary",
     "hostPosition": 43,
-    "protocolVersion": "1.0.0",
-    "schemaVersion": "1.0.0",
+    "protocolVersion": "1.2.0",
+    "schemaVersion": "1.2.0",
     "payloadKind": "event",
     "origin": "host"
   },

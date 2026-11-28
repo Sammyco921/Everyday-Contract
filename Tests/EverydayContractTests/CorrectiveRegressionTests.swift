@@ -110,7 +110,7 @@ struct CorrectiveRegressionTests {
             + String(repeating: "]", count: containerDepth)
         return Data("""
         {"envelope":{"messageID":"msg-nested","correlationID":"corr-nested","sessionID":"session-nested",\
-        "protocolVersion":"1.0.0","schemaVersion":"1.0.0","payloadKind":"request",\
+        "protocolVersion":"1.2.0","schemaVersion":"1.2.0","payloadKind":"request",\
         "idempotencyKey":"idem-nested","origin":"client"},\
         "payload":{"kind":"request","value":{"kind":"command","value":{"command":"pauseObjective",\
         "target":{"kind":"objective","value":"objective-001"},\
@@ -131,7 +131,7 @@ struct CorrectiveRegressionTests {
             + String(repeating: "}", count: containerDepth)
         return Data("""
         {"envelope":{"messageID":"msg-nested-object","correlationID":"corr-nested-object",\
-        "sessionID":"session-nested-object","protocolVersion":"1.0.0","schemaVersion":"1.0.0",\
+        "sessionID":"session-nested-object","protocolVersion":"1.2.0","schemaVersion":"1.2.0",\
         "payloadKind":"request","idempotencyKey":"idem-nested-object","origin":"client"},\
         "payload":{"kind":"request","value":{"kind":"command","value":{"command":"pauseObjective",\
         "target":{"kind":"objective","value":"objective-001"},\

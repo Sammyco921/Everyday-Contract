@@ -9,6 +9,7 @@ struct FixtureTests {
         let names = [
             "request-command",
             "response-snapshot",
+            "response-command-result",
             "event-projection",
             "error-stale",
             "sync-delta",
@@ -24,7 +25,7 @@ struct FixtureTests {
         }
     }
 
-    @Test("Command fixture carries an idempotency key and bounded intent parameters")
+    @Test("Command fixture carries typed createObjective intent")
     func commandFixture() throws {
         let message = try fixtureMessage("request-command")
         #expect(message.envelope.payloadKind == .request)
@@ -37,8 +38,30 @@ struct FixtureTests {
         }
         #expect(command.command == .createObjective)
         #expect(command.target == ContractTarget.none)
-        #expect(command.parameters["intent"] == .string("Prepare a summary"))
-        #expect(command.parameters["priority"] == .int(2))
+        #expect(command.parameters.isEmpty)
+        guard case let .objectiveCreation(creation)? = command.payload else {
+            Issue.record("Expected a typed objective creation payload")
+            return
+        }
+        #expect(creation.statement.rawValue == "Prepare a summary")
+    }
+
+    @Test("Typed command result fixture carries the Host-generated objective identifier")
+    func typedCommandResultFixture() throws {
+        let message = try fixtureMessage("response-command-result")
+        #expect(message.envelope.hostPosition == HostPosition(47))
+
+        guard case let .response(.commandResult(result)) = message.payload else {
+            Issue.record("Expected a command result")
+            return
+        }
+        #expect(result.status == .completed)
+        #expect(result.result == nil)
+        guard case let .objectiveCreation(creation)? = result.typedResult else {
+            Issue.record("Expected a typed objective creation result")
+            return
+        }
+        #expect(creation.createdObjectiveID.rawValue == "objective-001")
     }
 
     @Test("Snapshot fixture is Host-authored and positioned")
@@ -61,6 +84,7 @@ struct FixtureTests {
         }
         #expect(tasks.count == 1)
         #expect(tasks.first?.status == .active)
+        #expect(tasks.first?.statement.rawValue == "Prepare a summary")
         #expect(tasks.first?.verificationState == .pending)
     }
 

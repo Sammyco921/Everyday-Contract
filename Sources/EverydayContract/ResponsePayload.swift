@@ -98,27 +98,100 @@ public enum CommandStatus: String, Codable, CaseIterable, Sendable {
     case needsOwner
 }
 
+/// Host-authored result for a successfully created objective.
+///
+/// The identifier is Host-generated. Contract does not infer persistence or authority from it.
+public struct ObjectiveCreationResult: Codable, Hashable, Sendable {
+    public let createdObjectiveID: ObjectiveID
+
+    public init(createdObjectiveID: ObjectiveID) {
+        self.createdObjectiveID = createdObjectiveID
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case createdObjectiveID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictContainer(
+            CodingKeys.self,
+            from: decoder,
+            type: "ObjectiveCreationResult"
+        )
+        self.init(
+            createdObjectiveID: try container.decode(ObjectiveID.self, forKey: .createdObjectiveID)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(createdObjectiveID, forKey: .createdObjectiveID)
+    }
+}
+
+/// Typed command-result payloads. Generic metadata and typed results are separate representations
+/// and must never be present on the same `CommandResult`.
+public enum CommandResultPayload: Codable, Hashable, Sendable {
+    case objectiveCreation(ObjectiveCreationResult)
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case value
+    }
+
+    private enum Kind: String, Codable, Sendable {
+        case objectiveCreation
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictContainer(
+            CodingKeys.self,
+            from: decoder,
+            type: "CommandResultPayload"
+        )
+        switch try container.decode(Kind.self, forKey: .kind) {
+        case .objectiveCreation:
+            self = .objectiveCreation(
+                try container.decode(ObjectiveCreationResult.self, forKey: .value)
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case let .objectiveCreation(value):
+            try container.encode(Kind.objectiveCreation, forKey: .kind)
+            try container.encode(value, forKey: .value)
+        }
+    }
+}
+
 /// A Host-authored command outcome.
 ///
 /// A command result is not a projection replacement and may be positionless when no committed
 /// position applies, such as a rejected command. When `hostPosition` is present, the envelope must
-/// carry the matching Host identity and position.
+/// carry the matching Host identity and position. Existing commands use the generic `result`; typed
+/// commands use `typedResult`. The two representations are mutually exclusive.
 public struct CommandResult: Codable, Hashable, Sendable {
     public let status: CommandStatus
     public let hostPosition: HostPosition?
     public let acceptedMessageID: MessageID?
     public let result: [String: JSONValue]?
+    public let typedResult: CommandResultPayload?
 
     public init(
         status: CommandStatus,
         hostPosition: HostPosition? = nil,
         acceptedMessageID: MessageID? = nil,
-        result: [String: JSONValue]? = nil
+        result: [String: JSONValue]? = nil,
+        typedResult: CommandResultPayload? = nil
     ) {
         self.status = status
         self.hostPosition = hostPosition
         self.acceptedMessageID = acceptedMessageID
         self.result = result
+        self.typedResult = typedResult
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
@@ -126,15 +199,24 @@ public struct CommandResult: Codable, Hashable, Sendable {
         case hostPosition
         case acceptedMessageID
         case result
+        case typedResult
     }
 
     public init(from decoder: Decoder) throws {
         let container = try strictContainer(CodingKeys.self, from: decoder, type: "CommandResult")
+        let result = try container.decodeIfPresent([String: JSONValue].self, forKey: .result)
+        let typedResult = try container.decodeIfPresent(CommandResultPayload.self, forKey: .typedResult)
+        guard result == nil || typedResult == nil else {
+            throw ContractDecodingError.invalidCommandResult(
+                reason: "result and typedResult are mutually exclusive"
+            )
+        }
         self.init(
             status: try container.decode(CommandStatus.self, forKey: .status),
             hostPosition: try container.decodeIfPresent(HostPosition.self, forKey: .hostPosition),
             acceptedMessageID: try container.decodeIfPresent(MessageID.self, forKey: .acceptedMessageID),
-            result: try container.decodeIfPresent([String: JSONValue].self, forKey: .result)
+            result: result,
+            typedResult: typedResult
         )
     }
 
@@ -144,6 +226,7 @@ public struct CommandResult: Codable, Hashable, Sendable {
         try container.encodeIfPresent(hostPosition, forKey: .hostPosition)
         try container.encodeIfPresent(acceptedMessageID, forKey: .acceptedMessageID)
         try container.encodeIfPresent(result, forKey: .result)
+        try container.encodeIfPresent(typedResult, forKey: .typedResult)
     }
 }
 

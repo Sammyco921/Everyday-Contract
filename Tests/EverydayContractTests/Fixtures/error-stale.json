@@ -3,8 +3,8 @@
     "messageID": "msg-004",
     "correlationID": "corr-003",
     "sessionID": "session-001",
-    "protocolVersion": "1.0.0",
-    "schemaVersion": "1.0.0",
+    "protocolVersion": "1.2.0",
+    "schemaVersion": "1.2.0",
     "payloadKind": "error",
     "origin": "host"
   },

@@ -25,9 +25,29 @@ struct SynchronizationTests {
         }
         #expect(task.objectiveID.rawValue == "objective-001")
         #expect(task.objectiveVersion == 2)
+        #expect(task.statement.rawValue == "Prepare a summary")
         #expect(task.status == .verifying)
         #expect(task.completedWorkItemCount == 3)
         #expect(task.remainingWorkItemCount == 0)
+    }
+
+    @Test("Draft is an available display-level task status")
+    func draftStatusIsAvailable() {
+        #expect(TaskStatus.draft.rawValue == "draft")
+        #expect(TaskStatus.allCases.contains(.draft))
+    }
+
+    @Test("Task snapshots and deltas require a statement field")
+    func taskViewsRequireStatement() throws {
+        for name in ["response-snapshot", "sync-delta"] {
+            let original = String(data: try fixtureData(name), encoding: .utf8)!
+            let needle = "\"statement\": \"Prepare a summary\",\n"
+            #expect(original.contains(needle), "Fixture \(name) lacks a statement field")
+            let withoutStatement = original.replacingOccurrences(of: needle, with: "")
+            #expect(throws: DecodingError.self) {
+                _ = try JSONContractCoder.decode(Data(withoutStatement.utf8))
+            }
+        }
     }
 
     @Test("Repeated delivery of the same positioned delta is structurally identical")

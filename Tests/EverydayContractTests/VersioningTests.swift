@@ -98,13 +98,19 @@ struct VersioningTests {
         }
     }
 
-    @Test("Current profile claims only its implemented baseline")
+    @Test("Current profile claims only its implemented 1.2.0 baseline")
     func currentProfile() {
-        #expect(ContractProfiles.current.packageVersion == .v1_0_0)
-        #expect(ContractProfiles.current.protocolVersion == .v1_0_0)
-        #expect(ContractProfiles.current.schemaVersion == .v1_0_0)
+        #expect(ContractProfiles.current.packageVersion == .v1_2_0)
+        #expect(ContractProfiles.current.protocolVersion == .v1_2_0)
+        #expect(ContractProfiles.current.schemaVersion == .v1_2_0)
+        #expect(ContractProfiles.current.supportedProtocolRange.minimum == .v1_2_0)
+        #expect(ContractProfiles.current.supportedProtocolRange.maximum == .v1_2_0)
+        #expect(ContractProfiles.current.supportedProtocolRange.supports(.v1_2_0))
         #expect(!ContractProfiles.current.supportedProtocolRange.supports(
             SemanticVersion(major: 1, minor: 1, patch: 0)
+        ))
+        #expect(!ContractProfiles.current.supportedProtocolRange.supports(
+            SemanticVersion(major: 1, minor: 2, patch: 1)
         ))
     }
 }

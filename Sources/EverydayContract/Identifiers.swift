@@ -10,6 +10,22 @@ public enum ContractLimits {
     public static let maximumParameterBytes = 16_384
     /// Maximum number of nested arrays or objects in a `JSONValue`. A scalar has depth zero.
     public static let maximumJSONNestingDepth = 32
+
+    /// Maximum UTF-8 byte length of one conversation message body. This bounds the body itself;
+    /// the complete encoded `ContractMessage` must still satisfy `maximumMessageBytes`.
+    public static let maximumConversationMessageBodyUTF8Bytes = 1_048_576
+
+    /// Maximum Unicode scalars in one conversation message body. This is one half of the UTF-8
+    /// ceiling, so the byte and scalar ceilings are independently enforceable: dense multibyte text
+    /// is rejected by the byte ceiling, while long single-byte text is rejected by this ceiling.
+    public static let maximumConversationMessageBodyUnicodeScalars =
+        maximumConversationMessageBodyUTF8Bytes / 2
+
+    /// Maximum Unicode scalars in one canonical objective statement.
+    public static let maximumObjectiveStatementUnicodeScalars = 512
+
+    /// Maximum UTF-8 bytes in one canonical objective statement.
+    public static let maximumObjectiveStatementUTF8Bytes = 2_048
 }
 
 /// Marker protocol for Host-owned or session-owned identifiers carried in the shared contract.

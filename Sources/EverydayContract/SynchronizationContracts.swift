@@ -12,6 +12,7 @@ public enum ProjectionKind: String, Codable, CaseIterable, Sendable {
 /// Display-level status for a task projection. It is deliberately not the Host's internal execution
 /// state machine; the Host owns and reports the authoritative meaning.
 public enum TaskStatus: String, Codable, CaseIterable, Sendable {
+    case draft
     case active
     case waitingForInput
     case blocked
@@ -33,6 +34,7 @@ public enum VerificationState: String, Codable, CaseIterable, Sendable {
 public struct TaskProjection: Codable, Hashable, Sendable {
     public let objectiveID: ObjectiveID
     public let objectiveVersion: UInt64
+    public let statement: ObjectiveStatement
     public let runID: RunID?
     public let planVersion: UInt64?
     public let status: TaskStatus
@@ -46,6 +48,7 @@ public struct TaskProjection: Codable, Hashable, Sendable {
     public init(
         objectiveID: ObjectiveID,
         objectiveVersion: UInt64,
+        statement: ObjectiveStatement,
         runID: RunID? = nil,
         planVersion: UInt64? = nil,
         status: TaskStatus,
@@ -58,6 +61,7 @@ public struct TaskProjection: Codable, Hashable, Sendable {
     ) {
         self.objectiveID = objectiveID
         self.objectiveVersion = objectiveVersion
+        self.statement = statement
         self.runID = runID
         self.planVersion = planVersion
         self.status = status
@@ -72,6 +76,7 @@ public struct TaskProjection: Codable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case objectiveID
         case objectiveVersion
+        case statement
         case runID
         case planVersion
         case status
@@ -88,6 +93,7 @@ public struct TaskProjection: Codable, Hashable, Sendable {
         self.init(
             objectiveID: try container.decode(ObjectiveID.self, forKey: .objectiveID),
             objectiveVersion: try container.decode(UInt64.self, forKey: .objectiveVersion),
+            statement: try container.decode(ObjectiveStatement.self, forKey: .statement),
             runID: try container.decodeIfPresent(RunID.self, forKey: .runID),
             planVersion: try container.decodeIfPresent(UInt64.self, forKey: .planVersion),
             status: try container.decode(TaskStatus.self, forKey: .status),
@@ -104,6 +110,7 @@ public struct TaskProjection: Codable, Hashable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(objectiveID, forKey: .objectiveID)
         try container.encode(objectiveVersion, forKey: .objectiveVersion)
+        try container.encode(statement, forKey: .statement)
         try container.encodeIfPresent(runID, forKey: .runID)
         try container.encodeIfPresent(planVersion, forKey: .planVersion)
         try container.encode(status, forKey: .status)
@@ -184,6 +191,73 @@ public struct ConversationMessageReference: Codable, Hashable, Sendable {
         try container.encode(receivedAt, forKey: .receivedAt)
         try container.encode(contentReferenceID, forKey: .contentReferenceID)
         try container.encodeIfPresent(externalReference, forKey: .externalReference)
+    }
+}
+
+/// Role of a Host-authored conversation message. The owner and assistant roles describe
+/// authorship for display and carry no authority.
+public enum ConversationMessageRole: String, Codable, CaseIterable, Sendable {
+    case owner
+    case assistant
+}
+
+/// Host-authored publication of actual text content in one conversation message.
+///
+/// This is a separate body-bearing representation. It does not repurpose `ConversationMessageReference`
+/// or `ContentAvailability`, and it carries no attachment, image, file, or artifact payload. The
+/// envelope supplies Host identity, correlation, and causation; `hostPosition` must agree with the
+/// envelope position.
+public struct ConversationMessageContent: Codable, Hashable, Sendable {
+    public let messageID: ConversationMessageID
+    public let conversationID: ConversationID
+    public let role: ConversationMessageRole
+    public let body: ConversationMessageBody
+    public let hostPosition: HostPosition
+
+    public init(
+        messageID: ConversationMessageID,
+        conversationID: ConversationID,
+        role: ConversationMessageRole,
+        body: ConversationMessageBody,
+        hostPosition: HostPosition
+    ) {
+        self.messageID = messageID
+        self.conversationID = conversationID
+        self.role = role
+        self.body = body
+        self.hostPosition = hostPosition
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case messageID
+        case conversationID
+        case role
+        case body
+        case hostPosition
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictContainer(
+            CodingKeys.self,
+            from: decoder,
+            type: "ConversationMessageContent"
+        )
+        self.init(
+            messageID: try container.decode(ConversationMessageID.self, forKey: .messageID),
+            conversationID: try container.decode(ConversationID.self, forKey: .conversationID),
+            role: try container.decode(ConversationMessageRole.self, forKey: .role),
+            body: try container.decode(ConversationMessageBody.self, forKey: .body),
+            hostPosition: try container.decode(HostPosition.self, forKey: .hostPosition)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(messageID, forKey: .messageID)
+        try container.encode(conversationID, forKey: .conversationID)
+        try container.encode(role, forKey: .role)
+        try container.encode(body, forKey: .body)
+        try container.encode(hostPosition, forKey: .hostPosition)
     }
 }
 

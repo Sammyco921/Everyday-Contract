@@ -6,8 +6,8 @@
     "sessionID": "session-001",
     "hostIdentity": "host-primary",
     "hostPosition": 42,
-    "protocolVersion": "1.0.0",
-    "schemaVersion": "1.0.0",
+    "protocolVersion": "1.2.0",
+    "schemaVersion": "1.2.0",
     "payloadKind": "response",
     "origin": "host"
   },
@@ -27,6 +27,7 @@
               {
                 "objectiveID": "objective-001",
                 "objectiveVersion": 1,
+                "statement": "Prepare a summary",
                 "runID": "run-001",
                 "planVersion": 1,
                 "status": "active",

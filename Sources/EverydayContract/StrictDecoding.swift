@@ -8,6 +8,9 @@ public enum ContractDecodingError: Error, Equatable, LocalizedError {
     case invalidSemanticVersion(String)
     case invalidJSONValue(String)
     case jsonNestingTooDeep(maximum: Int)
+    case invalidConversationMessageBody(reason: String)
+    case invalidObjectiveStatement(reason: String)
+    case invalidCommandResult(reason: String)
 
     public var errorDescription: String? {
         switch self {
@@ -23,6 +26,12 @@ public enum ContractDecodingError: Error, Equatable, LocalizedError {
             return "Invalid JSON value: \(reason)."
         case let .jsonNestingTooDeep(maximum):
             return "JSON nesting exceeds the maximum depth of \(maximum)."
+        case let .invalidConversationMessageBody(reason):
+            return "Invalid conversation message body: \(reason)."
+        case let .invalidObjectiveStatement(reason):
+            return "Invalid objective statement: \(reason)."
+        case let .invalidCommandResult(reason):
+            return "Invalid command result: \(reason)."
         }
     }
 }

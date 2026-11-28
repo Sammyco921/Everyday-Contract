@@ -181,6 +181,8 @@ public enum EventPayload: Codable, Hashable, Sendable {
     case channelCondition(ChannelCondition)
     case approvalAvailable(ApprovalNotice)
     case recoveryNotice(RecoveryNotice)
+    /// Host-authored publication of actual conversation text for an owner Client.
+    case conversationMessageContent(ConversationMessageContent)
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case kind
@@ -193,6 +195,7 @@ public enum EventPayload: Codable, Hashable, Sendable {
         case channelCondition
         case approvalAvailable
         case recoveryNotice
+        case conversationMessageContent
     }
 
     public init(from decoder: Decoder) throws {
@@ -208,6 +211,10 @@ public enum EventPayload: Codable, Hashable, Sendable {
             self = .approvalAvailable(try container.decode(ApprovalNotice.self, forKey: .value))
         case .recoveryNotice:
             self = .recoveryNotice(try container.decode(RecoveryNotice.self, forKey: .value))
+        case .conversationMessageContent:
+            self = .conversationMessageContent(
+                try container.decode(ConversationMessageContent.self, forKey: .value)
+            )
         }
     }
 
@@ -228,6 +235,9 @@ public enum EventPayload: Codable, Hashable, Sendable {
             try container.encode(value, forKey: .value)
         case let .recoveryNotice(value):
             try container.encode(Kind.recoveryNotice, forKey: .kind)
+            try container.encode(value, forKey: .value)
+        case let .conversationMessageContent(value):
+            try container.encode(Kind.conversationMessageContent, forKey: .kind)
             try container.encode(value, forKey: .value)
         }
     }

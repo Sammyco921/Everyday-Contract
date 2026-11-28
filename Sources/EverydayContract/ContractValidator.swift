@@ -21,6 +21,17 @@ public enum ContractValidationError: Error, Equatable, LocalizedError {
     case projectionPayloadMismatch(projection: ProjectionKind)
     case projectionChangeMismatch(projection: ProjectionKind)
     case messageTooLarge(bytes: Int, maximum: Int)
+    case missingConversationTarget(CommandKind)
+    case invalidConversationTarget(CommandKind)
+    case conversationTargetMismatch
+    case missingCommandPayload(CommandKind)
+    case unexpectedCommandPayload(CommandKind)
+    case commandParametersNotAllowed(CommandKind)
+    case clientCommandCarriesHostState
+    case conversationContentPositionMismatch
+    case missingObjectiveCreationTarget
+    case invalidObjectiveCreationTarget
+    case commandResultRepresentationConflict
 
     public var errorDescription: String? {
         switch self {
@@ -64,6 +75,28 @@ public enum ContractValidationError: Error, Equatable, LocalizedError {
             return "A delta change does not belong to projection \(projection.rawValue)."
         case let .messageTooLarge(bytes, maximum):
             return "Message size \(bytes) bytes exceeds \(maximum)."
+        case let .missingConversationTarget(command):
+            return "\(command.rawValue) requires a conversation target."
+        case let .invalidConversationTarget(command):
+            return "\(command.rawValue) requires a conversation target."
+        case .conversationTargetMismatch:
+            return "The command target and submission conversation do not match."
+        case let .missingCommandPayload(command):
+            return "\(command.rawValue) requires its typed command payload."
+        case let .unexpectedCommandPayload(command):
+            return "\(command.rawValue) does not accept that typed command payload."
+        case let .commandParametersNotAllowed(command):
+            return "\(command.rawValue) does not accept generic command parameters."
+        case .clientCommandCarriesHostState:
+            return "A Client command may not carry Host identity or Host position."
+        case .conversationContentPositionMismatch:
+            return "Conversation message content position does not match the envelope."
+        case .missingObjectiveCreationTarget:
+            return "createObjective requires a target."
+        case .invalidObjectiveCreationTarget:
+            return "createObjective requires the none target."
+        case .commandResultRepresentationConflict:
+            return "A command result cannot carry both generic and typed result representations."
         }
     }
 }
@@ -147,9 +180,70 @@ public enum ContractValidator {
             guard envelope.idempotencyKey != nil else {
                 throw ContractValidationError.missingIdempotencyKey
             }
-            try validateJSONMetadata(command.parameters)
+            switch command.command {
+            case .submitConversationMessage:
+                try validateConversationMessageSubmission(command, envelope: envelope)
+            case .createObjective:
+                try validateObjectiveCreation(command, envelope: envelope)
+            default:
+                guard command.payload == nil else {
+                    throw ContractValidationError.unexpectedCommandPayload(command.command)
+                }
+                try validateJSONMetadata(command.parameters)
+            }
         case .synchronize:
             break
+        }
+    }
+
+    private static func validateConversationMessageSubmission(
+        _ command: CommandRequest,
+        envelope: MessageEnvelope
+    ) throws {
+        guard let target = command.target else {
+            throw ContractValidationError.missingConversationTarget(command.command)
+        }
+        guard case let .conversation(targetConversationID) = target else {
+            throw ContractValidationError.invalidConversationTarget(command.command)
+        }
+        guard let payload = command.payload else {
+            throw ContractValidationError.missingCommandPayload(command.command)
+        }
+        guard case let .conversationMessageSubmission(submission) = payload else {
+            throw ContractValidationError.unexpectedCommandPayload(command.command)
+        }
+        guard submission.conversationID == targetConversationID else {
+            throw ContractValidationError.conversationTargetMismatch
+        }
+        guard command.parameters.isEmpty else {
+            throw ContractValidationError.commandParametersNotAllowed(command.command)
+        }
+        guard envelope.hostIdentity == nil, envelope.hostPosition == nil else {
+            throw ContractValidationError.clientCommandCarriesHostState
+        }
+    }
+
+    private static func validateObjectiveCreation(
+        _ command: CommandRequest,
+        envelope: MessageEnvelope
+    ) throws {
+        guard let target = command.target else {
+            throw ContractValidationError.missingObjectiveCreationTarget
+        }
+        guard case ContractTarget.none = target else {
+            throw ContractValidationError.invalidObjectiveCreationTarget
+        }
+        guard let payload = command.payload else {
+            throw ContractValidationError.missingCommandPayload(command.command)
+        }
+        guard case .objectiveCreation = payload else {
+            throw ContractValidationError.unexpectedCommandPayload(command.command)
+        }
+        guard command.parameters.isEmpty else {
+            throw ContractValidationError.commandParametersNotAllowed(command.command)
+        }
+        guard envelope.hostIdentity == nil, envelope.hostPosition == nil else {
+            throw ContractValidationError.clientCommandCarriesHostState
         }
     }
 
@@ -180,6 +274,9 @@ public enum ContractValidator {
                 guard envelope.hostPosition == position else {
                     throw ContractValidationError.hostPositionMismatch
                 }
+            }
+            guard result.result == nil || result.typedResult == nil else {
+                throw ContractValidationError.commandResultRepresentationConflict
             }
             if let payload = result.result {
                 try validateJSONMetadata(payload)
@@ -258,6 +355,10 @@ public enum ContractValidator {
                 guard envelope.hostPosition == notice.hostPosition else {
                     throw ContractValidationError.hostPositionMismatch
                 }
+            }
+        case let .conversationMessageContent(content):
+            guard envelope.hostPosition == content.hostPosition else {
+                throw ContractValidationError.conversationContentPositionMismatch
             }
         case .hostCondition, .channelCondition, .recoveryNotice:
             break

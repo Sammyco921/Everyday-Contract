@@ -3,8 +3,8 @@
     "messageID": "msg-001",
     "correlationID": "corr-001",
     "sessionID": "session-001",
-    "protocolVersion": "1.0.0",
-    "schemaVersion": "1.0.0",
+    "protocolVersion": "1.2.0",
+    "schemaVersion": "1.2.0",
     "payloadKind": "request",
     "idempotencyKey": "idem-001",
     "origin": "client"
@@ -18,9 +18,12 @@
         "target": {
           "kind": "none"
         },
-        "parameters": {
-          "intent": "Prepare a summary",
-          "priority": 2
+        "parameters": {},
+        "payload": {
+          "kind": "objectiveCreation",
+          "value": {
+            "statement": "Prepare a summary"
+          }
         }
       }
     }

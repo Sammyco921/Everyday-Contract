@@ -67,6 +67,7 @@ public struct SemanticVersion: Codable, Hashable, Comparable, Sendable, CustomSt
     public var description: String { "\(major).\(minor).\(patch)" }
 
     public static let v1_0_0 = SemanticVersion(major: 1, minor: 0, patch: 0)
+    public static let v1_2_0 = SemanticVersion(major: 1, minor: 2, patch: 0)
 }
 
 /// An inclusive SemVer range. A declared range must represent semantics the peer actually implements.
@@ -163,13 +164,13 @@ public struct ContractProfile: Codable, Hashable, Sendable {
 public enum ContractProfiles {
     /// The baseline contract implemented by this package. No future compatibility is claimed.
     public static let v1 = ContractProfile(
-        packageVersion: .v1_0_0,
-        protocolVersion: .v1_0_0,
+        packageVersion: .v1_2_0,
+        protocolVersion: .v1_2_0,
         supportedProtocolRange: try! ProtocolRange(
-            minimum: .v1_0_0,
-            maximum: .v1_0_0
+            minimum: .v1_2_0,
+            maximum: .v1_2_0
         ),
-        schemaVersion: .v1_0_0
+        schemaVersion: .v1_2_0
     )
 
     public static let current = v1

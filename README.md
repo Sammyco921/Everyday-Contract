@@ -46,12 +46,68 @@ Requests may be a query, a command, or a synchronization operation. Commands car
 key; command parameters are bounded JSON intent, never authority. The shared `CommandKind` cases do
 not define per-command parameter schemas, required targets, consequences, approval semantics, or
 authority effects. Those rules belong to the Host, which remains the source of truth for every
-projection.
+projection. `CommandRequest.payload` is an optional typed payload used only where a command cannot
+safely carry its subject through generic parameters.
 
 Responses carry query results, command outcomes, or synchronization results. A `CommandResult` may
 be positionless when no committed position applies. When it reports a position, the envelope must
 carry matching Host identity and position; `acceptedMessageID` is a structural reference to the
 command being answered, not evidence that the Host authorized or completed the command.
+
+### Conversation message submission and publication
+
+`CommandKind.submitConversationMessage` is a Client-origin command intent targeting one conversation.
+It requires `CommandPayload.conversationMessageSubmission` with an explicit `ConversationID` matching
+`CommandRequest.target` and a typed `ConversationMessageBody`. It requires the standard envelope
+idempotency key; it rejects generic parameters, Client-supplied Host identity or Host position, and
+unknown fields. It carries no approval, tool, objective, task, execution, attachment, image, file, or
+artifact fields. Contract does not authenticate the sender, authorize the command, persist the
+message, invoke inference, or publish content.
+
+A `ConversationMessageBody` must contain at least one non-whitespace character after trimming. The
+original string is retained. The exact inclusive limits are:
+
+| Limit | Constant | Value |
+|---|---|---|
+| UTF-8 bytes | `ConversationMessageBody.maximumUTF8Bytes` | 1,048,576 (1 MiB) |
+| Unicode scalars | `ConversationMessageBody.maximumUnicodeScalars` | 524,288 (one half of the byte ceiling, so both limits are independently enforceable) |
+
+The whole encoded `ContractMessage` is still subject to `ContractLimits.maximumMessageBytes`, so a
+body near the body ceiling can make the complete message exceed the wire ceiling. Contract rejects
+oversized bodies at the validated boundary; it does not silently increase an existing limit.
+
+Host-authored publication uses `EventPayload.conversationMessageContent` carrying
+`ConversationMessageContent`: Host-assigned message identity, conversation identity, owner/assistant
+role, actual bounded text body, and `HostPosition`. The Host-authored envelope supplies Host identity
+and position, and its optional causation may link the publication to a preceding submission.
+`content.hostPosition` must equal the envelope Host position. This is a separate body-bearing
+representation; `ConversationMessageReference` and `ContentAvailability` remain metadata-only.
+
+Existing `CommandResult` statuses are reused without new runtime guarantees. Contract validates the
+status shape and optional fields only; it does not verify that the Host recorded an intent, completed a
+turn, refused a command, or retained a durable result. Applications decide when to emit each status,
+and any idempotency, persistence, replay behavior, or outcome truthfulness is an application
+responsibility.
+
+### Objective creation
+
+`CommandKind.createObjective` is a Client-origin intent with `CommandPayload.objectiveCreation`. It
+requires `ContractTarget.none`, an empty generic parameter map, and the standard idempotency key. It
+rejects other targets, typed payloads of a different kind, generic parameters, Client-supplied Host
+identity or Host position, and unknown fields. Contract does not authenticate the sender, authorize
+the objective, assign its identity, persist it, or start work.
+
+`ObjectiveCreation.statement` is an `ObjectiveStatement`. Construction and validated decoding apply
+NFC normalization, trim leading and trailing whitespace, collapse internal whitespace runs to one
+ASCII space, reject prohibited C0/C1 controls other than whitespace controls, and enforce inclusive
+limits of 512 Unicode scalars and 2,048 UTF-8 bytes on the canonical value. The canonical string is
+the only exposed value.
+
+A successful Host response may carry `CommandResult.typedResult` of
+`CommandResultPayload.objectiveCreation`, containing the Host-generated `createdObjectiveID`.
+Generic `CommandResult.result` remains available for existing commands. A single command result may
+not carry both representations; conflicting values are rejected at the validated boundary. Contract
+does not verify that the reported objective was durably created.
 
 ### Response identity and position
 
@@ -77,8 +133,13 @@ messages are not projection state and do not independently require Host state.
 
 The contract provides Host positions, snapshots, deltas, projection kinds, task projections,
 conversation projections and message references, paging cursors, and content availability metadata.
+Every task projection in both snapshots and deltas carries a required canonical `statement`;
+`TaskStatus.draft` is the display status for a newly created objective task.
 Projection events carry conversation and artifact references and metadata in typed fields; they do
-not carry conversation message bodies or artifact bytes. Consumers retrieve content separately.
+not carry conversation message bodies or artifact bytes. The separate
+`EventPayload.conversationMessageContent` event carries an actual bounded text body and does not
+weaken the metadata-only semantics of references or availability. Artifact bytes remain outside the
+contract.
 
 Contract validates these consistency relationships: a snapshot's `projection` matches its
 `ProjectionPayload` case; every delta change belongs to the delta's declared projection; a
@@ -105,18 +166,25 @@ Contract releases use SemVer. The supported grammar is the strict numeric triple
 build metadata such as `1.0.0-alpha` or `1.0.0+build.5` are **not** currently supported and are
 rejected as malformed.
 
-The baseline profile is Contract package `1.0.1`, protocol `1.0.0`, schema `1.0.0`, and supported
-protocol range `1.0.0...1.0.0`. `ProtocolRange.supports(_:)`, `ProtocolRange.intersection(with:)`,
+This release publishes Contract package `1.2.0`. Its current profile advertises package version
+`1.2.0`, protocol version `1.2.0`, schema version `1.2.0`, and supported protocol range
+`1.2.0...1.2.0`. `ProtocolRange.supports(_:)`, `ProtocolRange.intersection(with:)`,
 and profile validation are package-local compatibility helpers over the versions peers declare. They
 do not perform a wire-level version-negotiation handshake; applications decide how to exchange
 declarations and select a mutually supported version. A breaking protocol change requires a Contract
 major version. Unsupported versions are refused by validation rather than silently downgraded.
 
 Schema compatibility is exact for the current profile: an incoming message whose schema version is
-not exactly `1.0.0` is refused. A future schema change must therefore be treated as a coordinated
+not exactly `1.2.0` is refused. A future schema change must therefore be treated as a coordinated
 release. Because unknown fields are rejected, a newer peer that adds a field will be refused by an
-older peer. Upgrade Host and User Application Contract dependencies together whenever the Contract
-schema changes; mixed-release tolerance is not implemented.
+older peer.
+
+Contract 1.2.0 adds typed `createObjective` intent and result, `ObjectiveStatement`, `TaskStatus.draft`,
+and a required statement on every task projection. The earlier `submitConversationMessage` command,
+optional `CommandRequest.payload` field, and `conversationMessageContent` event remain present. Strict
+peers on older Contract releases reject the 1.2.0 versions and wire surface. Applications must
+upgrade Contract dependencies together before emitting or accepting it; mixed-release tolerance is
+not implemented.
 
 ### Serialization and the validated decoding boundary
 
@@ -169,7 +237,13 @@ parameters, targets, consequences, and approvals.
 `ContractValidator` checks envelope/payload agreement, exact protocol and schema support, origin,
 session/device binding presence, Host identity and position for Host-authored state, envelope/nested
 position agreement, projection/payload and change/projection consistency, idempotency presence,
-request and response page bounds, parameter bounds and nesting, and error representations.
+request and response page bounds, parameter bounds and nesting, conversation submission target and
+typed-payload rules, `createObjective` target/parameter/typed-payload rules, generic versus typed
+command-result exclusivity, Client Host-state exclusion, Host publication position agreement, and error
+representations. Body non-emptiness and body byte/scalar bounds are enforced by
+`ConversationMessageBody` at construction and decoding. Objective-statement canonicalization,
+control-character rejection, and scalar/byte bounds are enforced by `ObjectiveStatement` at
+construction and decoding.
 
 ### Secure communication expectations
 
@@ -207,10 +281,14 @@ rejection, origin and binding presence checks, error representation and identifi
 Host position and identity, missing idempotency, payload-kind mismatch, unsupported versions, inverted protocol-version
 ranges, restricted SemVer grammar, compatibility helpers, Host-positioned snapshots and deltas,
 nested position agreement, projection/payload and change/projection consistency, acknowledgement
-meaning boundaries, conversation references without bodies, request and response page bounds,
-inclusive parameter/nesting/message-size limits and their rejection just beyond those limits,
-event and command-result round trips, encode-side size enforcement, the structural-versus-validated
-decoding distinction, and the public message/status surface.
+meaning boundaries, conversation references without bodies, typed conversation submission and
+Host-authored body-bearing content round trips, body byte/scalar limits, submission target and
+payload validation, objective-statement canonicalization and inclusive scalar/byte boundaries, typed
+`createObjective` and typed creation-result round trips, generic/typed result exclusivity, task
+snapshot and delta statement requirements, parameter smuggling and Client Host-state rejection,
+request and response page bounds, inclusive parameter/nesting/message-size limits and their rejection
+just beyond those limits, event and command-result round trips, encode-side size enforcement, the
+structural-versus-validated decoding distinction, and the public message/status surface.
 
 This coverage is a regression check, not a guarantee. These tests do not establish duplicate-key
 rejection, standards-based canonical JSON, TLS or authentication enforcement, delta ordering or gap

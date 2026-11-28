@@ -1,0 +1,31 @@
+{
+  "envelope": {
+    "messageID": "msg-006",
+    "correlationID": "corr-001",
+    "causationID": "msg-001",
+    "sessionID": "session-001",
+    "hostIdentity": "host-primary",
+    "hostPosition": 47,
+    "protocolVersion": "1.2.0",
+    "schemaVersion": "1.2.0",
+    "payloadKind": "response",
+    "origin": "host"
+  },
+  "payload": {
+    "kind": "response",
+    "value": {
+      "kind": "commandResult",
+      "value": {
+        "status": "completed",
+        "hostPosition": 47,
+        "acceptedMessageID": "msg-001",
+        "typedResult": {
+          "kind": "objectiveCreation",
+          "value": {
+            "createdObjectiveID": "objective-001"
+          }
+        }
+      }
+    }
+  }
+}
